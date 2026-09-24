@@ -11,7 +11,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>Daywheel</AssemblyName>
     <RootNamespace>Daywheel</RootNamespace>
-    <Version>1.0.9</Version>
+    <Version>1.0.12</Version>
     <LangVersion>9.0</LangVersion>
     <!-- Unity's Mono doesn't read deps.json, and BepInEx loads plugins
          directly, so there's no point writing one. -->

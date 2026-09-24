@@ -11,6 +11,8 @@ It follows the game's own clock. Day runs from a quarter to three quarters of
 the way through each 20 minute cycle, so the light and dark halves match the
 sky you're under.
 
+![Daywheel in game, with its move menu and colour field open](https://raw.githubusercontent.com/VysesDarkheart/daywheel/v1.0.12/docs/screenshot.png)
+
 ## Themes
 
 There are seven looks to pick from:
@@ -27,8 +29,10 @@ Set one in the config, or flip through them in game (see below).
 
 ## Moving and resizing
 
-Press **F8** to move the wheel. Your character stands still until you
-finish. Then:
+Press **F8** to move the wheel. A small menu opens beside it, listing the
+keys, and it stays on screen wherever the wheel goes. Your character stands
+still until you finish. Put away a hammer, hoe or cultivator first: while
+one is out, the game uses the mouse for building. Then:
 
 - hold the left mouse button and move the mouse to drag the wheel. You don't
   need to point at it, so it works anywhere on screen
@@ -36,10 +40,15 @@ finish. Then:
 - the arrow keys nudge it (hold Shift for bigger steps, Ctrl for smaller)
 - right-click, or press **End**, for the next look, and **Home** for the one
   before
+- hold the middle mouse button and move the mouse to pick the day number's
+  colour: left and right change the colour, up and down make it lighter or
+  darker, and with Shift held, stronger or softer. A small field in the menu
+  shows where you are. A quick tap of the middle button puts back the colour
+  it came with
 
 Press **F8** again when you're done, and your controls come back. The
-position, size and look are saved. Opening your bag, the map or the game menu
-also ends it.
+position, size, look and colour are saved. Opening your bag, the map, the
+build menu or the game menu also ends it.
 
 It's done this way so the minimap stays in view while you line the wheel up.
 The bag's crafting panel and the big map both cover that corner.
@@ -50,6 +59,7 @@ The bag's crafting panel and the big map both cover that corner.
 |---|---|
 | `Show` | Turns the wheel on or off |
 | `ShowDayCount` | Shows the day number under the wheel |
+| `DayColor` | The day number's colour, as a hex code. `FFFFFF` is white |
 | `Size` | Width, in the game's interface units, so it follows the game's UI scale |
 | `X`, `Y` | Position, measured from the top right corner |
 | `Theme` | Which look to use, spelled exactly as listed above |

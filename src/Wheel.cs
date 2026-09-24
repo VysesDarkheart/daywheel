@@ -27,9 +27,39 @@ namespace Daywheel
         /// <summary>How far out the sun and moon ride, as a share of the width.</summary>
         private const float Orbit = 0.164f;
         private const double Tau = Math.PI * 2.0;
-        private const string DimHex = "#8B8477";
+        /// <summary>The day count's colour, unless the DayColor setting says otherwise.</summary>
+        internal static readonly Color DayDefault = new Color32(0x8B, 0x84, 0x77, 0xFF);
+        // Picking the day count's colour while moving: hold the middle button
+        // and move the mouse. Across, the marker follows the mouse; up and
+        // down it moves at half speed, because the field is short.
+        private const float PickHeight = 40f;
+        private const float PickGap = 6f;
+        private const float PickAcross = 1f;
+        private const float PickUp = 0.5f;
         /// <summary>
-        /// A key can reach us through two inputs, sometimes a frame apart.
+        /// A press this short, with the mouse moved less than TapTravel (in
+        /// hud units), is a tap, which puts back the default colour.
+        /// </summary>
+        private const float TapSeconds = 0.35f;
+        private const float TapTravel = 6f;
+        // The help shown while moving: light text on a dark box beside the wheel.
+        private const float HintSize = 16f;
+        private const float HintPadX = 10f;
+        private const float HintPadY = 7f;
+        /// <summary>Space between the help box and the wheel.</summary>
+        private const float HintGap = 6f;
+        /// <summary>Space kept between the help box and the screen's edge.</summary>
+        private const float HintEdge = 8f;
+        private const string HintKeyHex = "#E6C27A";
+        private static readonly Color HintText = new Color32(0xEC, 0xE7, 0xDA, 0xFF);
+        /// <summary>
+        /// How much of what's behind the help box it hides, as a browser would
+        /// mix it. A game that mixes colours as light needs a bigger number
+        /// for the same look; see HintBox.
+        /// </summary>
+        private const float HintShade = 0.85f;
+        /// <summary>
+        /// A key can arrive through two inputs, sometimes a frame apart.
         /// A second press of the same key inside this time is the same press.
         /// </summary>
         private const float SamePress = 0.25f;
@@ -52,13 +82,24 @@ namespace Daywheel
         private Image _moon;
         private Image _mark;
         private RectTransform _under;
+        /// <summary>The canvas the hud is drawn on, to turn screen pixels into hud units.</summary>
+        private Canvas _canvas;
         private TMP_Text _label;
         private TMP_Text _hint;
+        private RectTransform _hintRt;
+        private ColourField _field;
+        private RectTransform _fieldRt;
+        /// <summary>The marker on the colour field, and its middle, which shows the colour itself.</summary>
+        private RectTransform _dotRt;
+        private Image _dotFill;
         private Theme _theme;
         /// <summary>The setting as it read when the look was last put on.</summary>
         private string _worn;
         private bool _shown;
         private int _lastDay = -1;
+        private Color _dayColor;
+        /// <summary>How wide the day count's text is, measured when it's written.</summary>
+        private float _dayWidth;
         /// <summary>Every piece and its width as a share of the whole.</summary>
         private readonly List<KeyValuePair<RectTransform, float>> _pieces =
             new List<KeyValuePair<RectTransform, float>>();
@@ -108,10 +149,21 @@ namespace Daywheel
             float want = Mathf.Clamp(
                 Plugin.Size == null ? 62f : Plugin.Size.Value, 24f, 400f);
             if (Mathf.Abs(want - _across) > 0.01f) Fit(want);
-            Vector2 spot = new Vector2(
+            // A bigger wheel reaches further left and down, so while it's
+            // being moved the saved place is held on screen at its new size.
+            if (_moving) Move(0f, 0f);
+            // Shown on screen even if the setting points past its edge,
+            // say after a change to a smaller resolution. The setting itself
+            // is only changed by moving the wheel.
+            Vector2 spot = Keep(new Vector2(
                 Plugin.X == null ? -30f : Plugin.X.Value,
-                Plugin.Y == null ? -250f : Plugin.Y.Value);
+                Plugin.Y == null ? -250f : Plugin.Y.Value));
             if (_root.anchoredPosition != spot) _root.anchoredPosition = spot;
+            if (_moving)
+            {
+                Aim();
+                Swatch();
+            }
 
             float now = 0f;
             try { now = env.GetDayFraction(); }
@@ -178,10 +230,13 @@ namespace Daywheel
             int day = 0;
             try { day = env.GetDay(); }
             catch (Exception) { }
-            if (day == _lastDay) return;
+            Color colour = Plugin.DayColor == null ? DayDefault : Plugin.DayColor.Value;
+            if (day == _lastDay && colour == _dayColor) return;
             _lastDay = day;
-            _label.text = "<color=" + DimHex + ">Day "
+            _dayColor = colour;
+            _label.text = "<color=#" + ColorUtility.ToHtmlStringRGBA(colour) + ">Day "
                 + day.ToString(CultureInfo.InvariantCulture) + "</color>";
+            _dayWidth = _label.GetPreferredValues(_label.text).x;
         }
 
         /// <summary>
@@ -248,6 +303,16 @@ namespace Daywheel
         private bool _moving;
         private bool _held;
         private bool _over;
+        // The colour being picked, as hue, strength and lightness, each 0 to 1.
+        private bool _picking;
+        private float _pickFrom;
+        private float _pickTravel;
+        private float _pickH;
+        private float _pickS = 1f;
+        private float _pickL;
+        private float _pickAlpha = 1f;
+        /// <summary>The pick started from the shipped colour, which is nearly grey.</summary>
+        private bool _pickFromDefault;
         /// <summary>The player's controls, switched off while moving.</summary>
         private PlayerController _still;
         private readonly Dictionary<int, float> _lastPress = new Dictionary<int, float>();
@@ -268,8 +333,9 @@ namespace Daywheel
             if (!_moving) return;
 
             // The bag, the map, a trader or the game menu opening means
-            // you've moved on.
-            if (GameScreenOpen())
+            // you've moved on. So does taking out a building tool: see
+            // Building.
+            if (GameScreenOpen() || Building(Player.m_localPlayer))
             {
                 End();
                 return;
@@ -288,10 +354,7 @@ namespace Daywheel
             if (Held(KeyCode.RightArrow)) dx += step;
             if (Held(KeyCode.UpArrow)) dy += step;
             if (Held(KeyCode.DownArrow)) dy -= step;
-            if (dx != 0f && Plugin.X != null)
-                Plugin.X.Value = Mathf.Min(0f, Plugin.X.Value + dx);
-            if (dy != 0f && Plugin.Y != null)
-                Plugin.Y.Value = Mathf.Min(0f, Plugin.Y.Value + dy);
+            if (dx != 0f || dy != 0f) Move(dx, dy);
 
             float grow = 0f;
             if (Held(KeyCode.PageUp) || Held(KeyCode.Equals) || Held(KeyCode.KeypadPlus))
@@ -304,11 +367,35 @@ namespace Daywheel
             Drag();
         }
 
+        /// <summary>
+        /// Move the saved place by this much. It's kept on screen as it's
+        /// saved, so pushing past an edge doesn't store a place beyond it
+        /// that has to be dragged back before the wheel moves again.
+        /// </summary>
+        private void Move(float dx, float dy)
+        {
+            if (Plugin.X == null || Plugin.Y == null) return;
+            Vector2 at = new Vector2(Plugin.X.Value, Plugin.Y.Value);
+            Vector2 to = Keep(new Vector2(at.x + dx, at.y + dy));
+            if (to.x != at.x) Plugin.X.Value = to.x;
+            if (to.y != at.y) Plugin.Y.Value = to.y;
+        }
+
         /// <summary>Start moving: stop the character.</summary>
         private void Begin()
         {
             Player me = Player.m_localPlayer;
             if (me == null || GameScreenOpen()) return;
+            if (Building(me))
+            {
+                try
+                {
+                    me.Message(MessageHud.MessageType.Center,
+                        "Put your hammer, hoe or cultivator away to move the wheel.");
+                }
+                catch (Exception) { }
+                return;
+            }
 
             // Zero the controls first, or the character carries on with
             // whatever it was last told, running or swinging.
@@ -347,6 +434,7 @@ namespace Daywheel
             if (!_moving) return;
             _moving = false;
             _held = false;
+            _picking = false;
             if (_over) Hover(false);
 
             try { if (_still != null) _still.enabled = true; }
@@ -363,7 +451,9 @@ namespace Daywheel
 
         /// <summary>
         /// Hold the left button and move the mouse to drag the wheel, from
-        /// anywhere on screen. A right-click anywhere is the next look.
+        /// anywhere on screen. A right-click anywhere is the next look. Hold
+        /// the middle button and move to pick the day count's colour; a tap
+        /// of it puts back the default.
         /// </summary>
         private void Drag()
         {
@@ -371,7 +461,8 @@ namespace Daywheel
             if (Clicked(0)) _held = true;
             if (_held && !Down(0)) _held = false;
             if (_held != _over) Hover(_held);
-            if (!_held) return;
+            if (Clicked(2) && !_held) PickStart();
+            if (_picking && !Down(2)) PickEnd();
 
             Vector2 px = Moved();
             if (px.x == 0f && px.y == 0f) return;
@@ -380,10 +471,8 @@ namespace Daywheel
             // scale on screen includes the game's own interface scaling.
             float scale = _under == null ? 1f : _under.lossyScale.x;
             if (scale < 0.01f) scale = 1f;
-            if (Plugin.X != null)
-                Plugin.X.Value = Mathf.Min(0f, Plugin.X.Value + px.x / scale);
-            if (Plugin.Y != null)
-                Plugin.Y.Value = Mathf.Min(0f, Plugin.Y.Value + px.y / scale);
+            if (_held) Move(px.x / scale, px.y / scale);
+            else if (_picking) Pick(px / scale);
         }
 
         /// <summary>This frame's mouse movement, in screen pixels.</summary>
@@ -409,6 +498,145 @@ namespace Daywheel
                 Plugin.Log.Info("Daywheel: look is now " + Themes.All[at].Name + ".");
         }
 
+        // ---------------------------------------------------------- colour
+
+        /// <summary>The middle button went down: start from the colour the day count has now.</summary>
+        private void PickStart()
+        {
+            _picking = true;
+            _pickFrom = Time.unscaledTime;
+            _pickTravel = 0f;
+            Color c = DayColour();
+            float h;
+            float s;
+            ToHsl(c, out h, out s, out _pickL);
+            // Black, white and greys have no hue or strength of their own, so
+            // the last ones are kept for them.
+            if (s > 0.001f)
+            {
+                _pickH = h;
+                _pickS = s;
+            }
+            _pickAlpha = c.a;
+            _pickFromDefault = c == DayDefault;
+        }
+
+        /// <summary>
+        /// Move the pick by this much, in hud units: across for the hue, which
+        /// wraps round, and up for lighter, or with Shift held, for stronger.
+        /// </summary>
+        private void Pick(Vector2 by)
+        {
+            // A tap wobbles a little. Until it's clearly a move, nothing changes.
+            _pickTravel += by.magnitude;
+            if (_pickTravel < TapTravel) return;
+
+            bool strength = Held(KeyCode.LeftShift) || Held(KeyCode.RightShift);
+            // The shipped colour is a nearly grey tan, and at its strength
+            // every hue would look grey. So the first move away from it
+            // without Shift goes to full colour; Shift softens it again.
+            if (_pickFromDefault && !strength) _pickS = 1f;
+            _pickFromDefault = false;
+
+            float across = _fieldRt == null ? 200f : Mathf.Max(40f, _fieldRt.rect.width);
+            _pickH = Mathf.Repeat(_pickH + by.x * PickAcross / across, 1f);
+            float up = by.y * PickUp / PickHeight;
+            if (strength) _pickS = Mathf.Clamp01(_pickS + up);
+            else _pickL = Mathf.Clamp01(_pickL + up);
+
+            Color c = FromHsl(_pickH, _pickS, _pickL);
+            c.a = _pickAlpha;
+            if (Plugin.DayColor != null) Plugin.DayColor.Value = c;
+        }
+
+        /// <summary>The middle button came up. A tap puts back the default colour.</summary>
+        private void PickEnd()
+        {
+            _picking = false;
+            bool tap = _pickTravel < TapTravel && Time.unscaledTime - _pickFrom < TapSeconds;
+            if (tap && Plugin.DayColor != null) Plugin.DayColor.Value = DayDefault;
+            if (Plugin.Log != null)
+                Plugin.Log.Info("Daywheel: the day colour is now "
+                    + ColorUtility.ToHtmlStringRGB(DayColour()) + ".");
+        }
+
+        private static Color DayColour()
+        {
+            return Plugin.DayColor == null ? DayDefault : Plugin.DayColor.Value;
+        }
+
+        /// <summary>
+        /// Show on the colour field where the day count's colour sits, and
+        /// draw the field at that colour's strength.
+        /// </summary>
+        private void Swatch()
+        {
+            if (_field == null || _fieldRt == null || _dotRt == null) return;
+            Color c = DayColour();
+            float h = _pickH;
+            float s = _pickS;
+            float l = _pickL;
+            if (!_picking)
+            {
+                float was;
+                float strength;
+                ToHsl(c, out was, out strength, out l);
+                // Black, white and greys keep the last hue and strength, as
+                // in PickStart.
+                if (strength > 0.001f)
+                {
+                    h = was;
+                    s = strength;
+                }
+            }
+            // From the shipped colour a move goes to full colour (see Pick),
+            // so that's how the field is drawn for it.
+            bool shipped = _picking ? _pickFromDefault : c == DayDefault;
+            _field.Strength = shipped ? 1f : s;
+            Rect r = _fieldRt.rect;
+            _dotRt.anchoredPosition = new Vector2(h * r.width, l * r.height);
+            if (_dotFill != null) _dotFill.color = new Color(c.r, c.g, c.b, 1f);
+        }
+
+        /// <summary>A colour from hue, strength and lightness, each 0 to 1.</summary>
+        internal static Color FromHsl(float h, float s, float l)
+        {
+            float chroma = (1f - Mathf.Abs(2f * l - 1f)) * s;
+            float part = Mathf.Repeat(h, 1f) * 6f;
+            float x = chroma * (1f - Mathf.Abs(part % 2f - 1f));
+            float r = 0f;
+            float g = 0f;
+            float b = 0f;
+            if (part < 1f) { r = chroma; g = x; }
+            else if (part < 2f) { r = x; g = chroma; }
+            else if (part < 3f) { g = chroma; b = x; }
+            else if (part < 4f) { g = x; b = chroma; }
+            else if (part < 5f) { r = x; b = chroma; }
+            else { r = chroma; b = x; }
+            float m = l - chroma * 0.5f;
+            return new Color(r + m, g + m, b + m, 1f);
+        }
+
+        /// <summary>A colour's hue, strength and lightness, each 0 to 1. A grey's hue is 0.</summary>
+        private static void ToHsl(Color c, out float h, out float s, out float l)
+        {
+            float max = Mathf.Max(c.r, Mathf.Max(c.g, c.b));
+            float min = Mathf.Min(c.r, Mathf.Min(c.g, c.b));
+            l = (max + min) * 0.5f;
+            float d = max - min;
+            if (d < 0.0001f)
+            {
+                h = 0f;
+                s = 0f;
+                return;
+            }
+            s = Mathf.Clamp01(d / (1f - Mathf.Abs(2f * l - 1f)));
+            if (max == c.r) h = (c.g - c.b) / d;
+            else if (max == c.g) h = (c.b - c.r) / d + 2f;
+            else h = (c.r - c.g) / d + 4f;
+            h = Mathf.Repeat(h / 6f, 1f);
+        }
+
         /// <summary>Lift the mark while the wheel is held, so you can see it's picked up.</summary>
         private void Hover(bool on)
         {
@@ -417,25 +645,172 @@ namespace Daywheel
                 _markRt.localScale = on ? new Vector3(1.1f, 1.1f, 1f) : Vector3.one;
         }
 
-        /// <summary>What to do, shown only while moving.</summary>
+        /// <summary>What to do, shown only while moving, one thing to a line.</summary>
         private void Shout()
         {
-            if (_hint == null) return;
-            _hint.gameObject.SetActive(_moving);
+            if (_hint == null || _hintRt == null) return;
+            _hintRt.gameObject.SetActive(_moving);
             if (!_moving) return;
-            _hint.text = "<color=" + DimHex + "><size=90%>hold left mouse and move to drag  ·  "
-                + "arrows nudge  ·  Page Up/Down resize  ·  right-click for the next look  ·  "
-                + MoveKey() + " when done</size></color>";
+            _hint.text = Line("Drag", "hold left mouse and move")
+                + "\n" + Line("Nudge", "arrow keys (Shift for big steps, Ctrl for fine)")
+                + "\n" + Line("Size", "Page Up bigger, Page Down smaller")
+                + "\n" + Line("Look", "right-click or End, Home goes back")
+                + "\n" + Line("Colour", "hold middle and move (Shift for strength)")
+                + "\n" + Line("Default colour", "tap middle")
+                + "\n" + Line("Done", MoveKey().ToString());
+            // The box fits the text, with the colour field under it, so it's
+            // measured whenever the text is set.
+            Vector2 text = _hint.GetPreferredValues(_hint.text);
+            _hintRt.sizeDelta = new Vector2(
+                text.x + HintPadX * 2f,
+                text.y + PickGap + PickHeight + HintPadY * 2f);
         }
 
-        /// <summary>Is one of the game's own screens open?</summary>
+        private static string Line(string what, string how)
+        {
+            return "<color=" + HintKeyHex + ">" + what + ":</color> " + how;
+        }
+
+        /// <summary>
+        /// The help box's colour. Mixed as light, a see-through dark layer
+        /// lets through far more than its number says, so the share that
+        /// shows through is taken to the same power as the wheel's soft
+        /// pictures (Themes.Soften).
+        /// </summary>
+        private static Color HintBox()
+        {
+            float a = Themes.Linear()
+                ? 1f - Mathf.Pow(1f - HintShade, Themes.Soften)
+                : HintShade;
+            return new Color(0f, 0f, 0f, a);
+        }
+
+        /// <summary>
+        /// Put the help box beside the wheel: under it and its day count if
+        /// there's room, otherwise above, and level with the wheel's side
+        /// nearer the screen's edge, so the box reaches in toward the middle.
+        /// Then it's pushed back inside the screen if any of it is out.
+        /// </summary>
+        private void Aim()
+        {
+            if (_hintRt == null || _root == null || _under == null) return;
+            Rect r = _under.rect;
+            Vector2 lo;
+            Vector2 hi;
+            if (!ScreenBounds(out lo, out hi))
+            {
+                lo = r.min;
+                hi = r.max;
+            }
+
+            // The wheel's top right corner, in the hud's units. The box is
+            // placed by its own top right corner, measured from there.
+            Vector2 corner = new Vector2(r.xMax, r.yMax) + _root.anchoredPosition;
+            Vector2 box = _hintRt.sizeDelta;
+
+            float top = corner.y - _across - DayRoom() - HintGap;
+            if (top - box.y < lo.y + HintEdge) top = corner.y + HintGap + box.y;
+
+            float middle = corner.x - _across * 0.5f;
+            float right = middle > (lo.x + hi.x) * 0.5f
+                ? corner.x
+                : corner.x - _across + box.x;
+
+            float rightMin = lo.x + HintEdge + box.x;
+            float topMin = lo.y + HintEdge + box.y;
+            right = Mathf.Clamp(right, rightMin, Mathf.Max(rightMin, hi.x - HintEdge));
+            top = Mathf.Clamp(top, topMin, Mathf.Max(topMin, hi.y - HintEdge));
+
+            _hintRt.anchoredPosition = new Vector2(right, top) - corner;
+        }
+
+        /// <summary>
+        /// A place for the wheel, measured like the X and Y settings from the
+        /// hud's top right corner, moved just enough that the wheel and its
+        /// day count are on screen.
+        /// </summary>
+        private Vector2 Keep(Vector2 at)
+        {
+            Vector2 lo;
+            Vector2 hi;
+            if (_under == null || !ScreenBounds(out lo, out hi))
+                return new Vector2(Mathf.Min(0f, at.x), Mathf.Min(0f, at.y));
+
+            Rect r = _under.rect;
+            float spill = DaySpill();
+            float left = lo.x - r.xMax + _across + spill;
+            float right = hi.x - r.xMax - spill;
+            float bottom = lo.y - r.yMax + _across + DayRoom();
+            float top = hi.y - r.yMax;
+            at.x = Mathf.Clamp(at.x, left, Mathf.Max(left, right));
+            at.y = Mathf.Clamp(at.y, bottom, Mathf.Max(bottom, top));
+            return at;
+        }
+
+        /// <summary>
+        /// The height the day count takes up under the wheel: its gap, and
+        /// a line of text, which is a little taller than the font size.
+        /// </summary>
+        private float DayRoom()
+        {
+            bool wantDay = Plugin.ShowDay == null || Plugin.ShowDay.Value;
+            return wantDay && _label != null ? 2f + _label.fontSize * 1.3f : 0f;
+        }
+
+        /// <summary>
+        /// How far the day count reaches past each side of the wheel. Only a
+        /// small wheel has one: its text can't shrink below a readable size.
+        /// </summary>
+        private float DaySpill()
+        {
+            bool wantDay = Plugin.ShowDay == null || Plugin.ShowDay.Value;
+            return wantDay && _label != null ? Mathf.Max(0f, (_dayWidth - _across) * 0.5f) : 0f;
+        }
+
+        /// <summary>
+        /// The screen's bottom left and top right corners, in the hud's own
+        /// units. False if they can't be worked out.
+        /// </summary>
+        private bool ScreenBounds(out Vector2 lo, out Vector2 hi)
+        {
+            lo = Vector2.zero;
+            hi = Vector2.zero;
+            if (_under == null) return false;
+            try
+            {
+                Camera eye = _canvas == null || _canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                    ? null
+                    : _canvas.worldCamera;
+                return RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                        _under, Vector2.zero, eye, out lo)
+                    && RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                        _under, new Vector2(Screen.width, Screen.height), eye, out hi);
+            }
+            catch (Exception) { return false; }
+        }
+
+        /// <summary>Is one of the game's own screens open, the build menu among them?</summary>
         private static bool GameScreenOpen()
         {
             try
             {
                 return InventoryGui.IsVisible() || StoreGui.IsVisible()
-                    || Menu.IsVisible() || Minimap.IsOpen();
+                    || Menu.IsVisible() || Minimap.IsOpen()
+                    || Hud.IsPieceSelectionVisible();
             }
+            catch (Exception) { return false; }
+        }
+
+        /// <summary>
+        /// Is a hammer, hoe or cultivator out? With one out, the game reads
+        /// the mouse itself (Player.UpdatePlacement), not through the
+        /// controls paused while moving: a left-click places a piece, a
+        /// right-click opens the build menu and a middle-click removes one.
+        /// So the wheel isn't moved while one is out.
+        /// </summary>
+        private static bool Building(Player me)
+        {
+            try { return me != null && me.InPlaceMode(); }
             catch (Exception) { return false; }
         }
 
@@ -555,9 +930,18 @@ namespace Daywheel
             return d;
         }
 
+        /// <summary>
+        /// Hidden with the rest of the hud. For a cutscene or sleep the game
+        /// doesn't switch the hud off, it moves it far off to the side
+        /// (Hud.SetVisible), and Keep would pull the wheel back into view.
+        /// </summary>
         private static bool Hidden()
         {
-            try { return Hud.IsUserHidden(); }
+            try
+            {
+                return Hud.IsUserHidden()
+                    || (Hud.instance != null && !Hud.instance.IsVisible());
+            }
             catch (Exception) { return false; }
         }
 
@@ -581,6 +965,8 @@ namespace Daywheel
 
             _under = under.transform as RectTransform;
             if (_under == null) return false;
+            Canvas canvas = _under.GetComponentInParent<Canvas>();
+            _canvas = canvas == null ? null : canvas.rootCanvas;
 
             // The hud goes when the world unloads, and the last wheel went
             // with it. Nothing of that one carries over: the new pictures
@@ -591,6 +977,7 @@ namespace Daywheel
             _lastDay = -1;
             _held = false;
             _over = false;
+            _picking = false;
 
             GameObject go = new GameObject("Daywheel", typeof(RectTransform));
             go.transform.SetParent(under.transform, false);
@@ -661,25 +1048,58 @@ namespace Daywheel
             text.SetActive(true);
             _label = t;
 
-            // What to do, shown only while moving.
+            // What to do, shown only while moving: light text on a dark box,
+            // placed beside the wheel each frame by Aim. It stays switched
+            // off until then, so the text has its font long before it wakes.
             GameObject tip = new GameObject("Hint", typeof(RectTransform));
             tip.SetActive(false);
             tip.transform.SetParent(_root, false);
-            RectTransform tipRt = tip.GetComponent<RectTransform>();
-            tipRt.anchorMin = new Vector2(1f, 0f);
-            tipRt.anchorMax = new Vector2(1f, 0f);
-            tipRt.pivot = new Vector2(1f, 1f);
-            tipRt.anchoredPosition = new Vector2(0f, -24f);
-            tipRt.sizeDelta = new Vector2(460f, 22f);
-            TextMeshProUGUI tt = tip.AddComponent<TextMeshProUGUI>();
+            _hintRt = tip.GetComponent<RectTransform>();
+            _hintRt.anchorMin = new Vector2(1f, 1f);
+            _hintRt.anchorMax = new Vector2(1f, 1f);
+            _hintRt.pivot = new Vector2(1f, 1f);
+            Image box = tip.AddComponent<Image>();
+            box.color = HintBox();
+            box.raycastTarget = false;
+
+            GameObject words = new GameObject("Text", typeof(RectTransform));
+            words.SetActive(false);
+            words.transform.SetParent(tip.transform, false);
+            RectTransform wordsRt = words.GetComponent<RectTransform>();
+            wordsRt.anchorMin = Vector2.zero;
+            wordsRt.anchorMax = Vector2.one;
+            wordsRt.offsetMin = new Vector2(HintPadX, HintPadY + PickHeight + PickGap);
+            wordsRt.offsetMax = new Vector2(-HintPadX, -HintPadY);
+            TextMeshProUGUI tt = words.AddComponent<TextMeshProUGUI>();
             tt.font = hud.m_messageText.font;
             tt.fontSharedMaterial = hud.m_messageText.fontSharedMaterial;
-            tt.fontSize = 14f;
-            tt.alignment = TextAlignmentOptions.TopRight;
+            tt.fontSize = HintSize;
+            tt.color = HintText;
+            tt.alignment = TextAlignmentOptions.TopLeft;
             tt.textWrappingMode = TextWrappingModes.NoWrap;
             tt.raycastTarget = false;
             tt.richText = true;
+            words.SetActive(true);
             _hint = tt;
+
+            // The colour field under the text, as wide as the box, and its
+            // marker: a dark edge, a light ring, and the colour itself.
+            GameObject field = new GameObject("Colours", typeof(RectTransform));
+            field.transform.SetParent(tip.transform, false);
+            _fieldRt = field.GetComponent<RectTransform>();
+            _fieldRt.anchorMin = new Vector2(0f, 0f);
+            _fieldRt.anchorMax = new Vector2(1f, 0f);
+            _fieldRt.pivot = new Vector2(0.5f, 0f);
+            _fieldRt.offsetMin = new Vector2(HintPadX, HintPadY);
+            _fieldRt.offsetMax = new Vector2(-HintPadX, HintPadY + PickHeight);
+            _field = field.AddComponent<ColourField>();
+            _field.raycastTarget = false;
+
+            _dotRt = Square(_fieldRt, "Marker", 11f, Color.black, out _);
+            _dotRt.anchorMin = Vector2.zero;
+            _dotRt.anchorMax = Vector2.zero;
+            RectTransform ringRt = Square(_dotRt, "Ring", 9f, Color.white, out _);
+            Square(ringRt, "Fill", 5f, DayColour(), out _dotFill);
 
             Fit(across);
             _shown = true;
@@ -703,7 +1123,15 @@ namespace Daywheel
                 rt.sizeDelta = new Vector2(w, w);
             }
             if (_label != null)
-                _label.fontSize = Mathf.Clamp(across * 0.20f, 9f, 28f);
+            {
+                float size = Mathf.Clamp(across * 0.20f, 9f, 28f);
+                if (_label.fontSize != size)
+                {
+                    _label.fontSize = size;
+                    // Written again at the new size, which measures it again.
+                    _lastDay = -1;
+                }
+            }
         }
 
         /// <summary>
@@ -723,6 +1151,23 @@ namespace Daywheel
             img.raycastTarget = false;
             _pieces.Add(new KeyValuePair<RectTransform, float>(rt, share));
             return new Tuple<RectTransform, Image>(rt, img);
+        }
+
+        /// <summary>A plain square of one colour, centred on its parent.</summary>
+        private static RectTransform Square(Transform parent, string name, float size,
+                                            Color colour, out Image img)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(size, size);
+            img = go.AddComponent<Image>();
+            img.color = colour;
+            img.raycastTarget = false;
+            return rt;
         }
 
         private void Show(bool on)
@@ -757,9 +1202,16 @@ namespace Daywheel
             _mark = null;
             _label = null;
             _hint = null;
+            _hintRt = null;
+            _field = null;
+            _fieldRt = null;
+            _dotRt = null;
+            _dotFill = null;
+            _picking = false;
             _theme = null;
             _worn = null;
             _under = null;
+            _canvas = null;
             _held = false;
             _over = false;
             _pieces.Clear();

@@ -15,10 +15,11 @@ namespace Daywheel
     public class Plugin : BaseUnityPlugin
     {
         public const string Guid = "com.vysesdarkheart.daywheel";
-        public const string Ver = "1.0.9";
+        public const string Ver = "1.0.12";
 
         internal static ConfigEntry<bool> Show;
         internal static ConfigEntry<bool> ShowDay;
+        internal static ConfigEntry<Color> DayColor;
         internal static ConfigEntry<float> Size;
         internal static ConfigEntry<float> X;
         internal static ConfigEntry<float> Y;
@@ -48,6 +49,10 @@ namespace Daywheel
                 "Turns the wheel on or off.");
             ShowDay = Config.Bind("Wheel", "ShowDayCount", true,
                 "Shows the day number under the wheel.");
+            DayColor = Config.Bind("Wheel", "DayColor", Wheel.DayDefault,
+                "The day number's colour, as a hex code: FFFFFF is white, "
+                + "FFD27A gold, 8B8477 the default. Two more digits on the "
+                + "end set how solid it is, from 00 (invisible) to FF (solid).");
             Size = Config.Bind("Wheel", "Size", 62f,
                 "Width, in the game's interface units, so it follows the "
                 + "game's UI scale.");
@@ -59,12 +64,11 @@ namespace Daywheel
                 + "down. The minimap's size changes with screen resolution, so "
                 + "change this one if the two overlap.");
             MoveKey = Config.Bind("Wheel", "MoveKey", "F8",
-                "Press this to move the wheel. Your character stands still "
-                + "while you hold the left mouse button and move the mouse to "
-                + "drag it, use Page Up and Page Down to resize it, and "
-                + "right-click for the next look. Press it again when you're "
-                + "done. Any Unity key name, like F8 or Insert. A name Unity "
-                + "doesn't know means F8, and the log says so.");
+                "Press this to move the wheel, and press it again when you're "
+                + "done. Your character stands still in between, and a menu "
+                + "next to the wheel lists the keys. Put away a hammer, hoe or "
+                + "cultivator first. Any Unity key name, like F8 or Insert. A "
+                + "name Unity doesn't know means F8, and the log says so.");
             ThemeName = Config.Bind("Look", "Theme", Themes.All[0].Name,
                 new ConfigDescription(
                     "Which look to use, spelled exactly as listed. While "
