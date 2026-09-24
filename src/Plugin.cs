@@ -15,7 +15,7 @@ namespace Daywheel
     public class Plugin : BaseUnityPlugin
     {
         public const string Guid = "com.vysesdarkheart.daywheel";
-        public const string Ver = "1.0.8";
+        public const string Ver = "1.0.9";
 
         internal static ConfigEntry<bool> Show;
         internal static ConfigEntry<bool> ShowDay;
