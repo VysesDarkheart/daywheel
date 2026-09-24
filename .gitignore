@@ -1,0 +1,10 @@
+# Build output. src/Directory.Build.props may send it elsewhere; these
+# patterns cover the default layout.
+bin/
+obj/
+*.user
+*.suo
+
+# The game's own DLLs, if kept in the repo to build against. They belong to
+# Iron Gate.
+refs/

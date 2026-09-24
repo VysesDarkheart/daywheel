@@ -1,0 +1,108 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- RefDir is where Valheim's own assemblies live. They aren't in this
+       repository: put them in refs/ at its top, or pass -p:RefDir=...
+       No NuGet packages, so a build needs no network. -->
+
+  <PropertyGroup>
+    <!-- Valheim's assemblies are built against netstandard 2.1. A plugin
+         built against 2.0 can't see their signatures, and the build fails
+         with CS1705. -->
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>Daywheel</AssemblyName>
+    <RootNamespace>Daywheel</RootNamespace>
+    <Version>1.0.8</Version>
+    <LangVersion>9.0</LangVersion>
+    <!-- Unity's Mono doesn't read deps.json, and BepInEx loads plugins
+         directly, so there's no point writing one. -->
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <!-- This runs inside a live game, so a warning is treated as a bug. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningLevel>4</WarningLevel>
+    <!-- No symbol file in a release build. A .NET DLL records the full
+         path of its .pdb, which would put the build machine's folders into
+         a DLL that gets shared. -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
+    <Deterministic>true</Deterministic>
+    <!-- Keep the git commit out of the version text, so the same source
+         always builds the same DLL, committed or not. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <!-- Where Valheim's assemblies are, unless -p:RefDir says otherwise. -->
+    <RefDir Condition="'$(RefDir)' == ''">$(MSBuildProjectDirectory)\..\refs</RefDir>
+    <!-- UnityEngine.dll forwards types into every module in the game, so
+         MSBuild reports one conflict per module. Harmless here. -->
+    <MSBuildWarningsAsMessages>MSB3277</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Private=false: reference the game's own copies, never ship them. -->
+    <Reference Include="assembly_valheim">
+      <HintPath>$(RefDir)\assembly_valheim.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- The game reads keys and the mouse through ZInput, which lives here.
+         The wheel asks it as well as Unity's own input. -->
+    <Reference Include="assembly_utils">
+      <HintPath>$(RefDir)\assembly_utils.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="BepInEx">
+      <HintPath>$(RefDir)\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Name the modules this code actually uses. Add one when a file
+         needs it, not before. -->
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(RefDir)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Not redundant next to CoreModule: BepInEx.BaseUnityPlugin inherits
+         MonoBehaviour through the `UnityEngine` assembly name, and dropping
+         this fails with CS0012 on the plugin class. -->
+    <Reference Include="UnityEngine">
+      <HintPath>$(RefDir)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- The day count borrows the game's own font, which is TextMeshPro. -->
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(RefDir)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(RefDir)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(RefDir)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Unity's own input, which the wheel asks as well as the game's. -->
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(RefDir)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- TMP text is a MaskableGraphic, which lives here. -->
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(RefDir)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Turns the pictures back into textures. -->
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(RefDir)\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Every look's pictures, built into the DLL so nothing loose can go
+       missing. Each is named themes/<look>/<layer>.png, with whichever slash
+       the building machine puts between folders; Themes.cs reads either. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\assets\themes\**\*.png">
+      <LogicalName>themes/%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>
