@@ -5,16 +5,16 @@
        No NuGet packages, so a build needs no network. -->
 
   <PropertyGroup>
-    <!-- Valheim's assemblies are built against netstandard 2.1. A plugin
-         built against 2.0 can't see their signatures, and the build fails
-         with CS1705. -->
+    <!-- Valheim's assemblies are built against netstandard 2.1. A DLL built
+         against 2.0 can't see their signatures, and the build fails with
+         CS1705. -->
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>Daywheel</AssemblyName>
     <RootNamespace>Daywheel</RootNamespace>
-    <Version>1.0.12</Version>
+    <Version>1.0.13</Version>
     <LangVersion>9.0</LangVersion>
-    <!-- Unity's Mono doesn't read deps.json, and BepInEx loads plugins
-         directly, so there's no point writing one. -->
+    <!-- Unity's Mono doesn't read deps.json, so there's no point writing
+         one. -->
     <GenerateDependencyFile>false</GenerateDependencyFile>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
@@ -49,6 +49,9 @@
       <HintPath>$(RefDir)\assembly_utils.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- Only Plugin.cs and Keel's Bep.cs use BepInEx, and they only run when
+         BepInEx loads Daywheel. Started by Keel, neither is ever loaded, so
+         the game never looks for BepInEx.dll. -->
     <Reference Include="BepInEx">
       <HintPath>$(RefDir)\BepInEx.dll</HintPath>
       <Private>false</Private>
@@ -94,6 +97,12 @@
       <HintPath>$(RefDir)\UnityEngine.ImageConversionModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+  </ItemGroup>
+
+  <!-- Keel, which starts Daywheel with or without BepInEx, is compiled in
+       from its own folder. See keel/README.md. -->
+  <ItemGroup>
+    <Compile Include="..\keel\lib\*.cs" />
   </ItemGroup>
 
   <!-- Every look's pictures, built into the DLL so nothing loose can go

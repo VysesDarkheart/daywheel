@@ -26,8 +26,8 @@ namespace Daywheel
             {
                 if (_said.Contains(name)) return;
                 _said.Add(name);
-                if (Plugin.Log != null)
-                    Plugin.Log.Warn("Daywheel: " + name + " failed and was "
+                if (Main.Log != null)
+                    Main.Log.Warn("Daywheel: " + name + " failed and was "
                         + "skipped. " + e.GetType().Name + ": " + e.Message);
             }
         }

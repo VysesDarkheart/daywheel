@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.13
+
+- Daywheel no longer needs BepInEx. Installed by hand into your Valheim folder, it runs on its own, through Keel, a small starter that comes in the same zip.
+- It still works with BepInEx and mod managers, and your settings there carry over. If BepInEx is in the same game folder, it keeps starting first and your other mods keep running.
+- Installed by hand, it lets the game know that it's modded, the way BepInEx does, so the main menu says so and achievements are off.
+
 ## 1.0.12
 
 - Pick the day number's colour while moving the wheel: hold the middle mouse button and move the mouse. A quick tap puts back the colour it came with. There's a new `DayColor` setting for it too.

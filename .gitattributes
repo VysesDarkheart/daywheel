@@ -1,4 +1,5 @@
-# Text files are LF. The PNGs are declared binary.
+# Text files are LF, except Doorstop's settings file, which keeps the CRLF
+# of the file it copies. The PNGs are declared binary.
 #
 # Declaring the PNGs binary matters: this repository holds the icon and every
 # picture the wheel is drawn with. If git ever treated one as text it would
@@ -21,6 +22,7 @@
 *.ps1      text eol=lf
 
 *.txt      text eol=lf
+*.ini      text eol=crlf
 
 *.png binary
 *.jpg binary

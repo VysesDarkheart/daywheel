@@ -1,7 +1,8 @@
 # Daywheel
 
 A small day and night wheel for your HUD, so you can see at a glance how much
-daylight is left.
+daylight is left. It doesn't need BepInEx: copy it into your Valheim folder
+and play, or install it with a mod manager as usual.
 
 The mark at the top is "now". The ring turns as the day goes on, so the
 distance from the mark to the dark part is the daylight you've got left. The
@@ -66,21 +67,81 @@ The bag's crafting panel and the big map both cover that corner.
 | `Glow` | Glow strength. 1 is normal, 0 turns it off |
 | `MoveKey` | The key for moving the wheel, F8 by default |
 
-You can change these in your mod manager's config editor, or in Daywheel's
-file in `BepInEx/config`. You won't usually need to touch `Size`, `X` or `Y`
-yourself, since dragging the wheel sets them.
+When Keel starts Daywheel, it keeps these in `Keel\Daywheel\Daywheel.cfg`,
+which appears the first time you play. When BepInEx starts it, as it does
+with a mod manager, they're in BepInEx's config folder, where the manager's
+config editor can change them. You won't usually need to touch `Size`, `X`
+or `Y` yourself, since dragging the wheel sets them.
+
+## Installing
+
+You don't need BepInEx. Daywheel comes as one zip that works either way.
+
+**By hand:** use Manual Download on this page, then copy `winhttp.dll`,
+`doorstop_config.ini` and the `Keel` folder from the zip into your Valheim
+folder, the one with `valheim.exe` in it. In Steam you can find it by
+right-clicking Valheim and choosing Manage, then Browse local files. The two
+files are what start Daywheel with the game, and the `Keel` folder holds
+Daywheel itself. Then play as usual. Installing by hand works on Windows; on
+Linux and the Steam Deck, use a mod manager.
+
+**With a mod manager:** install Daywheel with r2modman or the Thunderstore Mod
+Manager, like any other mod. Mod managers start their mods through BepInEx,
+so the manager adds BepInEx for you, and Daywheel loads there as an ordinary
+BepInEx mod.
+
+If you use a mod manager for other mods, install Daywheel through it too. The
+manager puts its own copies of `winhttp.dll` and `doorstop_config.ini` back
+into the game folder every time it starts the game, so a copy installed by
+hand wouldn't start.
+
+If you run BepInEx without a mod manager, the simplest way is to put
+`Keel\Daywheel\Daywheel.dll` into `BepInEx\plugins`, in place of any older
+`Daywheel.dll` there.
+
+You can also install by hand as above, into a game folder that has BepInEx
+in it. Keel then starts BepInEx first, so BepInEx and your other mods keep
+running. Delete any older `Daywheel.dll` from `BepInEx\plugins` first,
+because Keel leaves Daywheel to BepInEx while BepInEx has a copy. Keep the
+`Keel` folder from then on, since Keel is what starts BepInEx now, and if you
+update BepInEx by hand later, copy Daywheel's `doorstop_config.ini` back in
+afterwards. If you'd switched BepInEx off and want it to stay off, add the
+line `StartBepInEx = false` to `Keel\Keel.cfg` before you start the game,
+making the file if it isn't there yet.
+
+To remove Daywheel, delete the `Keel\Daywheel` folder, or `Daywheel.dll` from
+`BepInEx\plugins` if that's where you put it, or uninstall it in your mod
+manager.
 
 ## Compatibility
 
 Daywheel doesn't patch the game and doesn't add anything to the network, so
 it's purely client side. Friends without it can still join your server, and
-it never changes your world or character files. The only file it writes is
-its own config. While you're moving the wheel it pauses your character's
-controls, and it gives them back the moment you finish. If something goes
-wrong inside it, it logs one line and keeps going.
+it never changes your world or character files. It writes nothing but its
+own settings file. Installed by hand, Keel also keeps a short log of what it
+started, and a settings file of its own once it finds BepInEx in the game
+folder. While you're moving the wheel it pauses your character's controls,
+and it gives them back the moment you finish. If something goes wrong inside
+it, it logs one line and keeps going.
 
-It needs BepInEx, which your mod manager installs along with it.
+Like any mod, it lets the game know that it's modded, so the main menu says
+so and achievements are off while it's installed, the same as with BepInEx.
 
-## Licence
+## Licence and credits
 
-MIT. The full text is in the `LICENSE` file that comes with the mod.
+Daywheel is released under the MIT licence. The full text is in the `LICENSE`
+file that comes with the mod.
+
+It starts through [Keel](https://github.com/VysesDarkheart/keel), a small
+starter that comes in the same zip and is MIT licensed too, with its licence
+in `Keel\Keel-LICENSE.txt`. Keel in turn
+starts with the game through
+[Unity Doorstop](https://github.com/NeighTools/UnityDoorstop) by NeighTools.
+The zip carries Doorstop's `winhttp.dll` unchanged, under the GNU Lesser
+General Public License 2.1, with that licence in `Keel\Doorstop-LICENSE.txt`
+and Doorstop's source code beside it. With a mod manager, Daywheel runs on
+[BepInEx](https://github.com/BepInEx/BepInEx), which is released under the
+LGPL 2.1 as well.
+
+The name on the store icon is set in Marcellus SC by Astigmatic, used under
+the SIL Open Font License.

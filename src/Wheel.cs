@@ -117,7 +117,7 @@ namespace Daywheel
 
         private void Tick()
         {
-            bool wanted = Plugin.Show == null || Plugin.Show.Value;
+            bool wanted = Main.Show == null || Main.Show.Value;
 
             if (!wanted || Player.m_localPlayer == null || Hud.instance == null
                 || Hidden())
@@ -134,7 +134,7 @@ namespace Daywheel
 
             // A new look takes hold at once, whether it came from the
             // setting or from a right-click while moving.
-            string asked = Plugin.ThemeName == null ? null : Plugin.ThemeName.Value;
+            string asked = Main.ThemeName == null ? null : Main.ThemeName.Value;
             if (_theme == null || !string.Equals(asked, _worn, StringComparison.Ordinal))
             {
                 if (!Wear(Themes.Find(asked))) { End(); Show(false); return; }
@@ -147,7 +147,7 @@ namespace Daywheel
             // Size and place are read every frame, so changing either one in
             // the config takes hold without leaving the game.
             float want = Mathf.Clamp(
-                Plugin.Size == null ? 62f : Plugin.Size.Value, 24f, 400f);
+                Main.Size == null ? 62f : Main.Size.Value, 24f, 400f);
             if (Mathf.Abs(want - _across) > 0.01f) Fit(want);
             // A bigger wheel reaches further left and down, so while it's
             // being moved the saved place is held on screen at its new size.
@@ -156,8 +156,8 @@ namespace Daywheel
             // say after a change to a smaller resolution. The setting itself
             // is only changed by moving the wheel.
             Vector2 spot = Keep(new Vector2(
-                Plugin.X == null ? -30f : Plugin.X.Value,
-                Plugin.Y == null ? -250f : Plugin.Y.Value));
+                Main.X == null ? -30f : Main.X.Value,
+                Main.Y == null ? -250f : Main.Y.Value));
             if (_root.anchoredPosition != spot) _root.anchoredPosition = spot;
             if (_moving)
             {
@@ -191,7 +191,7 @@ namespace Daywheel
             double t = Time.unscaledTimeAsDouble;
             float lit = Daylight(now);
             float glow = _theme.Glow
-                * (Plugin.Glow == null ? 1f : Mathf.Max(0f, Plugin.Glow.Value));
+                * (Main.Glow == null ? 1f : Mathf.Max(0f, Main.Glow.Value));
 
             // Three rates that never line up, so the fire flickers instead
             // of pulsing like a heartbeat.
@@ -219,7 +219,7 @@ namespace Daywheel
             Fade(_moon, 0.76f + 0.24f * (1f - lit));
 
             if (_label == null) return;
-            bool wantDay = Plugin.ShowDay == null || Plugin.ShowDay.Value;
+            bool wantDay = Main.ShowDay == null || Main.ShowDay.Value;
             if (!wantDay)
             {
                 if (_label.text.Length > 0) _label.text = string.Empty;
@@ -230,7 +230,7 @@ namespace Daywheel
             int day = 0;
             try { day = env.GetDay(); }
             catch (Exception) { }
-            Color colour = Plugin.DayColor == null ? DayDefault : Plugin.DayColor.Value;
+            Color colour = Main.DayColor == null ? DayDefault : Main.DayColor.Value;
             if (day == _lastDay && colour == _dayColor) return;
             _lastDay = day;
             _dayColor = colour;
@@ -361,8 +361,8 @@ namespace Daywheel
                 grow += step * 0.35f;
             if (Held(KeyCode.PageDown) || Held(KeyCode.Minus) || Held(KeyCode.KeypadMinus))
                 grow -= step * 0.35f;
-            if (grow != 0f && Plugin.Size != null)
-                Plugin.Size.Value = Mathf.Clamp(Plugin.Size.Value + grow, 24f, 400f);
+            if (grow != 0f && Main.Size != null)
+                Main.Size.Value = Mathf.Clamp(Main.Size.Value + grow, 24f, 400f);
 
             Drag();
         }
@@ -374,11 +374,11 @@ namespace Daywheel
         /// </summary>
         private void Move(float dx, float dy)
         {
-            if (Plugin.X == null || Plugin.Y == null) return;
-            Vector2 at = new Vector2(Plugin.X.Value, Plugin.Y.Value);
+            if (Main.X == null || Main.Y == null) return;
+            Vector2 at = new Vector2(Main.X.Value, Main.Y.Value);
             Vector2 to = Keep(new Vector2(at.x + dx, at.y + dy));
-            if (to.x != at.x) Plugin.X.Value = to.x;
-            if (to.y != at.y) Plugin.Y.Value = to.y;
+            if (to.x != at.x) Main.X.Value = to.x;
+            if (to.y != at.y) Main.Y.Value = to.y;
         }
 
         /// <summary>Start moving: stop the character.</summary>
@@ -420,11 +420,11 @@ namespace Daywheel
 
             _moving = true;
             _held = false;
-            Plugin.Saving(false);
+            Main.Saving(false);
             Shout();
 
-            if (_still == null && Plugin.Log != null)
-                Plugin.Log.Warn("Daywheel: couldn't pause your controls, so your "
+            if (_still == null && Main.Log != null)
+                Main.Log.Warn("Daywheel: couldn't pause your controls, so your "
                     + "character may move while you move the wheel.");
         }
 
@@ -441,12 +441,12 @@ namespace Daywheel
             catch (Exception) { }
             _still = null;
 
-            Plugin.Saving(true);
+            Main.Saving(true);
             Shout();
 
-            if (Plugin.Log != null)
-                Plugin.Log.Info("Daywheel: the wheel is now at X " + Num(Plugin.X)
-                    + ", Y " + Num(Plugin.Y) + ", size " + Num(Plugin.Size) + ".");
+            if (Main.Log != null)
+                Main.Log.Info("Daywheel: the wheel is now at X " + Num(Main.X)
+                    + ", Y " + Num(Main.Y) + ", size " + Num(Main.Size) + ".");
         }
 
         /// <summary>
@@ -482,7 +482,7 @@ namespace Daywheel
             catch (Exception) { return Vector2.zero; }
         }
 
-        private static string Num(BepInEx.Configuration.ConfigEntry<float> e)
+        private static string Num(Keel.Setting<float> e)
         {
             return e == null ? "?" : e.Value.ToString("0", CultureInfo.InvariantCulture);
         }
@@ -490,12 +490,12 @@ namespace Daywheel
         /// <summary>Step to the next look, or back one. The setting keeps it.</summary>
         private void Turn(int by)
         {
-            if (Plugin.ThemeName == null) return;
+            if (Main.ThemeName == null) return;
             int n = Themes.All.Length;
             int at = (Themes.IndexOf(_theme) + by + n) % n;
-            Plugin.ThemeName.Value = Themes.All[at].Name;
-            if (Plugin.Log != null)
-                Plugin.Log.Info("Daywheel: look is now " + Themes.All[at].Name + ".");
+            Main.ThemeName.Value = Themes.All[at].Name;
+            if (Main.Log != null)
+                Main.Log.Info("Daywheel: look is now " + Themes.All[at].Name + ".");
         }
 
         // ---------------------------------------------------------- colour
@@ -546,7 +546,7 @@ namespace Daywheel
 
             Color c = FromHsl(_pickH, _pickS, _pickL);
             c.a = _pickAlpha;
-            if (Plugin.DayColor != null) Plugin.DayColor.Value = c;
+            if (Main.DayColor != null) Main.DayColor.Value = c;
         }
 
         /// <summary>The middle button came up. A tap puts back the default colour.</summary>
@@ -554,15 +554,15 @@ namespace Daywheel
         {
             _picking = false;
             bool tap = _pickTravel < TapTravel && Time.unscaledTime - _pickFrom < TapSeconds;
-            if (tap && Plugin.DayColor != null) Plugin.DayColor.Value = DayDefault;
-            if (Plugin.Log != null)
-                Plugin.Log.Info("Daywheel: the day colour is now "
+            if (tap && Main.DayColor != null) Main.DayColor.Value = DayDefault;
+            if (Main.Log != null)
+                Main.Log.Info("Daywheel: the day colour is now "
                     + ColorUtility.ToHtmlStringRGB(DayColour()) + ".");
         }
 
         private static Color DayColour()
         {
-            return Plugin.DayColor == null ? DayDefault : Plugin.DayColor.Value;
+            return Main.DayColor == null ? DayDefault : Main.DayColor.Value;
         }
 
         /// <summary>
@@ -753,7 +753,7 @@ namespace Daywheel
         /// </summary>
         private float DayRoom()
         {
-            bool wantDay = Plugin.ShowDay == null || Plugin.ShowDay.Value;
+            bool wantDay = Main.ShowDay == null || Main.ShowDay.Value;
             return wantDay && _label != null ? 2f + _label.fontSize * 1.3f : 0f;
         }
 
@@ -763,7 +763,7 @@ namespace Daywheel
         /// </summary>
         private float DaySpill()
         {
-            bool wantDay = Plugin.ShowDay == null || Plugin.ShowDay.Value;
+            bool wantDay = Main.ShowDay == null || Main.ShowDay.Value;
             return wantDay && _label != null ? Mathf.Max(0f, (_dayWidth - _across) * 0.5f) : 0f;
         }
 
@@ -878,15 +878,15 @@ namespace Daywheel
 
         private static KeyCode MoveKey()
         {
-            if (Plugin.MoveKey == null) return KeyCode.F8;
-            string name = Plugin.MoveKey.Value;
+            if (Main.MoveKey == null) return KeyCode.F8;
+            string name = Main.MoveKey.Value;
             KeyCode k;
             if (Enum.TryParse(name, true, out k)) return k;
             if (!string.Equals(name, _badKey, StringComparison.Ordinal))
             {
                 _badKey = name;
-                if (Plugin.Log != null)
-                    Plugin.Log.Warn("Daywheel: MoveKey \"" + name + "\" isn't a key "
+                if (Main.Log != null)
+                    Main.Log.Warn("Daywheel: MoveKey \"" + name + "\" isn't a key "
                         + "name Unity knows, so F8 moves the wheel.");
             }
             return KeyCode.F8;
@@ -959,9 +959,9 @@ namespace Daywheel
             GameObject under = Hud.instance.m_rootObject;
             if (under == null) return false;
 
-            float across = Plugin.Size == null ? 62f : Plugin.Size.Value;
-            float x = Plugin.X == null ? -30f : Plugin.X.Value;
-            float y = Plugin.Y == null ? -250f : Plugin.Y.Value;
+            float across = Main.Size == null ? 62f : Main.Size.Value;
+            float x = Main.X == null ? -30f : Main.X.Value;
+            float y = Main.Y == null ? -250f : Main.Y.Value;
 
             _under = under.transform as RectTransform;
             if (_under == null) return false;

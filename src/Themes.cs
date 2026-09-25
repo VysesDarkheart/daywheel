@@ -43,7 +43,7 @@ namespace Daywheel
     /// <summary>
     /// Every look the wheel can wear.
     ///
-    /// The pictures are built into the plugin itself, so there is nothing
+    /// The pictures are built into the DLL itself, so there is nothing
     /// loose on disk to go missing or be changed underneath it. A look is
     /// read the first time it is worn and kept after that.
     /// </summary>
@@ -130,8 +130,8 @@ namespace Daywheel
             t.Softened = t.Ready && soften;
             if (t.Ready) Tell(t.Softened);
 
-            if (!t.Ready && Plugin.Log != null)
-                Plugin.Log.Warn("Daywheel: the " + t.Name + " look is missing a "
+            if (!t.Ready && Main.Log != null)
+                Main.Log.Warn("Daywheel: the " + t.Name + " look is missing a "
                     + "picture and was skipped.");
             return t.Ready;
         }
@@ -188,16 +188,16 @@ namespace Daywheel
         /// </summary>
         private static void Tell(bool softened)
         {
-            if (_told || Plugin.Log == null) return;
+            if (_told || Main.Log == null) return;
             _told = true;
             if (!Linear())
-                Plugin.Log.Info("Daywheel: the game mixes colours in gamma space, "
+                Main.Log.Info("Daywheel: the game mixes colours in gamma space, "
                     + "so the glow is drawn as it is.");
             else if (softened)
-                Plugin.Log.Info("Daywheel: the game mixes colours in linear space, "
+                Main.Log.Info("Daywheel: the game mixes colours in linear space, "
                     + "so the glow is adjusted to look as it was drawn.");
             else
-                Plugin.Log.Warn("Daywheel: the game mixes colours in linear space, "
+                Main.Log.Warn("Daywheel: the game mixes colours in linear space, "
                     + "but the glow couldn't be adjusted, so it may look stronger "
                     + "than it was drawn.");
         }
@@ -210,7 +210,7 @@ namespace Daywheel
         }
 
         /// <summary>
-        /// One picture out of the plugin, as a sprite.
+        /// One picture out of the DLL, as a sprite.
         ///
         /// Loaded just as it was drawn: sRGB, straight alpha, smooth
         /// scaling, clamped at the edges. No mipmaps: every clear pixel has
@@ -300,7 +300,7 @@ namespace Daywheel
         }
 
         /// <summary>
-        /// The pictures inside the plugin, by a name with forward slashes.
+        /// The pictures inside the DLL, by a name with forward slashes.
         /// The build names each one after its folder, and a folder is
         /// written with whichever slash the machine that built it uses.
         /// </summary>
