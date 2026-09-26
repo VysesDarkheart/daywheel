@@ -1,6 +1,6 @@
 {
   "name": "Daywheel",
-  "version_number": "1.0.13",
+  "version_number": "1.0.14",
   "author": "VysesDarkheart",
   "website_url": "https://github.com/VysesDarkheart/daywheel",
   "description": "A small day and night wheel for your HUD, so you can see at a glance how much daylight is left. Seven looks to choose from, and no BepInEx needed.",

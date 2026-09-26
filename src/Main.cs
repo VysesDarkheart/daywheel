@@ -15,7 +15,7 @@ namespace Daywheel
     {
         public const string Guid = "com.vysesdarkheart.daywheel";
         public const string Title = "Daywheel";
-        public const string Ver = "1.0.13";
+        public const string Ver = "1.0.14";
 
         internal static Keel.Setting<bool> Show;
         internal static Keel.Setting<bool> ShowDay;
